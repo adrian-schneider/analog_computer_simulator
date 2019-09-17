@@ -25,6 +25,7 @@ setChrSize(SvgGraph::MEDIUM);
 plot(100, 50);
 text("AnalogSim Circle Test", SvgGraph::NOMOVE);
 setChrSize(SvgGraph::TINY);
+setColor(SvgGraph::RED);
 axis(100, 600, 500, 0, -10.0, 10.0, 2.5, "%.1f", 1);
 axis(100, 100, 500, 2, -10.0, 10.0, 2.5, "%.1f", 1);
 mapDef(-10.0, -10.0, 10.0, 10.0, 100, 100, 599, 599);
@@ -47,17 +48,18 @@ $AnalogSim::time_div = 100; # Test with a small time div.
 my $j = 0.0;
 my $k = 0.0;
 my $i = 0;
-for (my $i = 0; $i <= 5*$AnalogSim::time_div; $i++) {
+my $lo = $AnalogSim::range_lo;
+for (my $i = 0; $i <= (SvgGraph::PI2 * 0.75)*$AnalogSim::time_div; $i++) {
 
-#                 indx  ic         sp
-  $k = integrator(0,    $AnalogSim::range_lo, -$j);
+#                 indx  ic     sp
+  $k = integrator(0,    $lo,   -$j);
 
-#                 indx  ic         sp
-  $j = integrator(1,    0.0,       $k);
+#                 indx  ic     sp
+  $j = integrator(1,    0.0,   $k);
 
-  #printf "%5i,%7.3f,%7.3f\n", $i, $k, $j;
-  !($i % 10) && plot(mapX($k), mapY($j));
+  !($i % ($AnalogSim::time_div / 10)) && plot(mapX($k), mapY($j));
 }
-error(0, 1) && status(0, 1);
-
+plot(mapX($k), mapY($j));
 endPage;
+
+error(0, 1) && status(0, 1);

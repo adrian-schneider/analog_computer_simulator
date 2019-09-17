@@ -32,8 +32,12 @@ our $range_lo = RANGE_LO_DFT;
 our $range_tol = RANGE_TOL_DFT;
 our $time_div = TIME_DIV_DFT;
 
-# Initialize a number n of elements.
-# Call before anything else from this module.
+# Initialize the simulator to provide a given number n of
+# computational elements.
+# The simulator allocates storage space to keep the state of intStart
+# computational elements.
+#
+# *** Call this procedure before anything else from this module.
 sub initElements {
   my $n = shift;
   @accumulator = (0.0) x $n;
@@ -41,13 +45,18 @@ sub initElements {
   @errorval = (0.0) x $n;
 }
 
-# { } = limit(idx, v)
-# err[idx] := 0
-# v := a[idx] > (range_hi + range_tol) -> err[idx] := 1; 
-#                                         erv[idx] := a[idx]; range_hi
-#      a[idx] < (range_hi - range_tol) -> err[idx] := 1;
-#                                         erv[idx] := a[idx]; range_lo
-#      1 -> a[idx]
+# { idx } means the limited value of the accumulator of element
+# number idx.
+# If the accumulator value lies outside the specified range plus a
+# tolerance band, the respective low or high range value is returned.
+# The function also sets the error status and error value according to the
+# evaluation result.
+#
+# v := a[idx]
+# v := v > (range_hi + range_tol) ? err[idx] := 1,
+#                                   erv[idx] := v, range_hi
+#      v < (range_lo - range_tol) ? err[idx] := 1,
+#                                   erv[idx] := v, range_lo
 # <- v
 sub limit {
   my $idx = shift;
@@ -67,12 +76,15 @@ sub limit {
   return $v;
 }
 
-# Make integrators to load ic at next time step.
+# Reset the simulator so the integrators load ic at the next time step.
+# On a real analog computer, this is equivalent to pushing the
+# "Load Initial Conditions"-button.
 sub intStart {
   $load_ic  = 1;
 }
 
-# Output a status of elements idx0 to idx1.
+# Output the error status and error value of the computational elements
+# number idx0 ro idx1.
 sub status {
   my ($idx0, $idx1) = @_;
   for (my $i = $idx0; $i <= $idx1; $i++) {
@@ -80,11 +92,13 @@ sub status {
   }
 }
 
-# Return a true value if any element in idx0 to idx1 is
+# Check a range of computational elements for an error Condition.
+# Return a true value if any computational element number idx0 to idx1 is
 # in error.
+#
 # e := 0
-# idx0<=idx<=idx1:
-#   err[idx] -> e := 1
+# idx0 <= idx <= idx1:
+#   err[idx] ? e := 1
 # <- e
 sub error {
   my ($idx0, $idx1) = @_;
@@ -98,25 +112,32 @@ sub error {
   return $e;
 }
 
-# Set a simulated coefficient "potentiometer".
-# Pots have names instead of index numbers.
+# Set a simulated coefficient virtual potentiometer.
+# The previous value is returned.
+#
+# *** Potentiometers are referenced by name rather than an index number.
+#
+# p := coef[name]
 # coef[name] := v
-# <- v
+# <- p
 sub setCoef {
   my ($name, $v) = @_;
+  my $p = $coef{$name};
   $coef{$name} = $v;
-  return $v;
+  return $p;
 }
 
-# Return the value of a coefficient "potentiometer".
+# Return the value of a coefficient virtual potentiometer.
 # <- coef[name]
 sub coef {
   my $name = shift;
   return $coef{$name};
 }
 
-# Execute one time step of a summer.
-# The summer is actually time-invariant.
+# Set the accumulator to the negative value of a summing point.
+# The summing point value is usually the result of an arithmetic expression.
+# The limited new accumulator value is returned.
+#
 # a[idx] := -sp
 # <- { idx }
 sub summer {
@@ -125,8 +146,10 @@ sub summer {
   return limit($idx);
 }
 
-# Execute one time step of a multiplier.
-# The multiplier is actually time-invariant.
+# Set the accumulator to the negative value of a summing point.
+# The summing point value is usually the result of an arithmetic expression.
+# The limited new accumulator value is returned.
+#
 # a[idx] := (in1p - in1n) * (in2p - in2n) / 10.0
 # <- { idx }
 sub multiplier {
@@ -135,8 +158,15 @@ sub multiplier {
   return limit($idx);
 }
 
-# Execute one time step of anintegrator.
-# a[idx] := a[idx] - sp/time_div
+# Set the accumulator to a fraction of  the negative value of a summing point.
+# The fraction is defined as 1/time_div.
+# This represents a single time step of the simulation of an integration over
+# time.
+# The summing point value is usually the result of an arithmetic expression.
+# The limited new accumulator value is returned.
+#
+# load_ic = 1 ? a[idx] := ic
+# load_ic = 0 ? a[idx] := a[idx] - sp/time_div
 # <- { idx }
 sub integrator {
   my ($idx, $ic, $sp) = @_;
@@ -144,14 +174,18 @@ sub integrator {
     $accumulator[$idx] = $ic;
     $load_ic = 0;
   }
-  $accumulator[$idx] -= $sp / $time_div;
+  else {
+    $accumulator[$idx] -= $sp / $time_div;
+  }
   return limit($idx);
 }
 
-# Execute one time step of a comparator.
-# The multiplier is actually time-invariant.
-# a[idx] := in1 >= in2 -> ref1
-#           in2 >  in1 -> ref2
+# Set the accumulator to one of two reference values, depending on the relation
+# between two given input values.
+# The limited new accumulator value is returned.
+#
+# a[idx] := in1 >= in2 ? ref1
+#           in2 >  in1 ? ref2
 # <- { idx }
 sub comparator {
   my ($idx, $in1, $in2, $ref1, $ref2) = @_;
