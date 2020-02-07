@@ -6,7 +6,7 @@ use Exporter;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 use File::Copy qw(copy);
 
-$VERSION     = 1.01;
+$VERSION     = 2.00;
 @ISA         = qw(Exporter);
 @EXPORT      = ();
 @EXPORT_OK   = qw(
@@ -68,6 +68,7 @@ our $forceinit       = 0;
 our $graphpathname   = "./.svggraph";
 our $indexfilename   = "${graphpathname}/index.html";
 our $graphfilename   = "${graphpathname}/graph.html";
+our $graphwatchname  = "${graphpathname}/graph.watch";
 our $graphspoolname  = "${graphpathname}/graph.tmp";
 our $graphspoolname2 = "${graphpathname}/graph2.tmp";
 our $copydirname     = ".";
@@ -261,6 +262,9 @@ sub endPage {
   }
   rename($graphspoolname, $graphfilename)
     or die "cannot rename $graphspoolname to $graphfilename:\n$!\n";
+  open(my $of, ">", $graphwatchname);
+  print $of '0';
+  close($of);
 }
 
 # Store a copy of the screen in a file.
@@ -408,16 +412,17 @@ sub axis {
   my $du = $u1 - $u0;
   my $j = 0;
   for (my $u = $u0; $u <= $u11; $u += $u2) {
+    plotLine;
+    my $tickH2 = ($j % $uj == 0) ? 1.5 * $tickH : $tickH;
+    if ($horz) {
+      plot($xy1, $y);
+      plot($xy1, $y + ($botm ? -$tickH2 : $tickH2));
+    } else {
+      plot($x, $xy1);
+      plot($x + ($left ? $tickH2 : -$tickH2), $xy1);
+    }
     if ($j % $uj == 0) {
       my $ufs = sprintf($uf, $u);
-      plotLine;
-      if ($horz) {
-        plot($xy1, $y);
-        plot($xy1, $y + ($botm ? -$tickH : $tickH));
-      } else {
-        plot($x, $xy1);
-        plot($x + ($left ? $tickH : -$tickH), $xy1);
-      }
       plotAlpha;
       if ($horz) {
         plot($xy1, $y + ($botm ? textH : -textH()/4));

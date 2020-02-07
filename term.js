@@ -21,6 +21,7 @@ var g_rootPath = './';
 
 const INDEXFILENAME = '.svggraph/index.html';
 const GRAPHFILENAME = '.svggraph/graph.html';
+const WATCHFILENAME = '.svggraph/graph.watch';
 
 function log(verbosity, text) {
   if (verbosity <= g_verbosityThsld) {
@@ -70,18 +71,16 @@ function rerunDelayedHandler(handler, filename, millis) {
   if (g_timerId) {
     clearTimeout(g_timerId);
   }
-  g_g_timerId = setTimeout(() => { handler(filename); }, millis);
+  g_timerId = setTimeout(() => { handler(filename); }, millis);
 }
 
 function establishFileWatch(handler, filename) {
   if (g_watchedFilename == '') {
-    if (g_fileWatcher) {
-      g_fileWatcher.close();
-    }
     g_watchedFileChanged = false;
     g_watchedFilename = filename;
     g_fileWatcher = g_fs.watch(filename, (event, eventFilename) => {
       if (eventFilename) {
+        log(VDEBUG2, `File watch event: ${event}`);
         // Debounce and dealy:
         // Any file change event occuring within the timeout period
         // prolongs that timeout period by the same amount.
@@ -121,9 +120,10 @@ function destroyOpenSockets() {
 }
 
 function deleteFiles() {
-  log(VINFO, `Deleting index and graph files.`);
+  log(VINFO, `Deleting index, graph and watch files.`);
   g_fs.unlinkSync(g_rootPath + INDEXFILENAME);
   g_fs.unlinkSync(g_rootPath + GRAPHFILENAME);
+  g_fs.unlinkSync(g_rootPath + WATCHFILENAME);
 }
 
 function exitServer() {
@@ -137,9 +137,10 @@ function exitServer() {
 }
 
 function serveFile(filename, response) {
+  log(VDEBUG1, `Serving file ${filename}.`);
   g_fs.readFile(filename, function (err, data) {
     if (err) {
-      log(VERROR, err);
+      log(VERROR, `Error ${err} serving file.`);
       response.writeHead(404, {'Content-Type': 'text/html'});
     }
     else {
@@ -162,7 +163,7 @@ function asStyledHtml(text, refresh) {
 function handleRequest(request, response) {
   var pathname = g_url.parse(request.url).pathname;
 
-  log(VDEBUG1, `Request for ${pathname} received.`);
+  log(VDEBUG1, `Request for path ${pathname} received.`);
 
   if (pathname == "/bye") {
     response.writeHead(200, {'Content-Type': 'text/html'});
@@ -188,9 +189,10 @@ function handleRequest(request, response) {
     }
   }
   else if (pathname == '/graph.html') {
-    var filename = g_rootPath + GRAPHFILENAME;
-    establishFileWatch(processFileChangeHandler, filename);
-    serveFile(filename, response);
+    var watchfilename = g_rootPath + WATCHFILENAME;
+    var graphfilename = g_rootPath + GRAPHFILENAME;
+    establishFileWatch(processFileChangeHandler, watchfilename);
+    serveFile(graphfilename, response);
   }
   else {
     log(VINFO, `Ignoring ${pathname}.`);
